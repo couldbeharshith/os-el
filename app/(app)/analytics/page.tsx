@@ -1,26 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Button } from "@/components/ui/button"
+import { useEffect, useState, useRef } from 'react'
 import { MemoryMetrics, TimelineData } from '@/app/types/analytics'
 import { MemoryHealthIndicator } from '@/app/components/monitoring/MemoryHealthIndicator'
 import { MemoryTimelineChart } from '@/app/components/visualizations/MemoryTimelineChart'
 import { MemoryOptimizer } from '@/app/components/analysis/MemoryOptimizer'
-import { Loader2 } from "lucide-react"
-import {
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
+import { SidebarInset } from "@/components/ui/sidebar"
 import { Header } from "@/app/components/header/Header"
+import { RefreshControl } from "@/app/components/header/RefreshControl"
 
 export default function AnalyticsPage() {
   const [metrics, setMetrics] = useState<MemoryMetrics | null>(null)
@@ -28,6 +15,8 @@ export default function AnalyticsPage() {
   const [timelineData, setTimelineData] = useState<TimelineData[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isAutoRefresh, setIsAutoRefresh] = useState(true)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchData = async () => {
     try {
@@ -58,32 +47,56 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
-  }, [])
+    
+    if (isAutoRefresh) {
+      intervalRef.current = setInterval(fetchData, 5000)
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isAutoRefresh])
 
-  const refreshButton = (
-    <Button onClick={fetchData} disabled={loading}>
-      {loading ? <Loader2 className="animate-spin" /> : 'Refresh Data'}
-    </Button>
+  const handleAutoRefreshChange = (enabled: boolean) => {
+    setIsAutoRefresh(enabled)
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }
+
+  const refreshControl = (
+    <RefreshControl
+      isAutoRefresh={isAutoRefresh}
+      onAutoRefreshChange={handleAutoRefreshChange}
+      onManualRefresh={fetchData}
+      isRefreshing={loading}
+    />
   )
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900 p-4 rounded-lg">
-        <h2 className="text-red-800 dark:text-red-200">Error</h2>
-        <p className="text-red-600 dark:text-red-300">{error}</p>
-      </div>
+      <SidebarInset>
+        <Header action={refreshControl} />
+        <div className="flex flex-1 flex-col gap-6 p-6">
+          <div className="bg-destructive/10 border border-destructive/20 p-6 rounded-lg">
+            <h2 className="text-lg font-semibold text-destructive mb-2">Error Loading Analytics</h2>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        </div>
+      </SidebarInset>
     )
   }
 
   return (
     <SidebarInset>
-      <Header action={refreshButton} />
-      <div className="flex flex-1 flex-col gap-4 p-4">
+      <Header action={refreshControl} />
+      <div className="flex flex-1 flex-col gap-6 p-6">
         {metrics && (
           <>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2">
               <MemoryHealthIndicator metrics={metrics} />
               {initialMetrics && <MemoryOptimizer metrics={initialMetrics} />}
             </div>

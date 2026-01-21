@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from '@/components/ui/button'
 import { SystemMemoryView } from '@/app/components/memory/SystemMemoryView'
 import { ProcessMemoryView } from '@/app/components/memory/ProcessMemoryView'
 import { MemoryMappingView } from '@/app/components/memory/MemoryMappingView'
@@ -10,15 +9,17 @@ import { MemoryMapVisualizer } from '@/app/components/visualizations/MemoryMapVi
 import { MemoryData } from '@/app/types/memory'
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Header } from "@/app/components/header/Header"
-import { Loader2 } from "lucide-react"
+import { RefreshControl } from "@/app/components/header/RefreshControl"
 
-const refreshInterval = parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL!)
+const refreshInterval = parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL || '5000')
 
 export default function Dashboard() {
   const [data, setData] = useState<MemoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('system')
   const [loading, setLoading] = useState(true)
+  const [isAutoRefresh, setIsAutoRefresh] = useState(true)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchData = async () => {
     try {
@@ -39,25 +40,43 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData()
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchData, refreshInterval)
-    return () => clearInterval(interval)
-  }, [])
+    
+    if (isAutoRefresh) {
+      intervalRef.current = setInterval(fetchData, refreshInterval)
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isAutoRefresh])
 
-  const refreshButton = (
-    <Button onClick={fetchData} disabled={loading}>
-      {loading ? <Loader2 className="animate-spin" /> : 'Refresh Data'}
-    </Button>
+  const handleAutoRefreshChange = (enabled: boolean) => {
+    setIsAutoRefresh(enabled)
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }
+
+  const refreshControl = (
+    <RefreshControl
+      isAutoRefresh={isAutoRefresh}
+      onAutoRefreshChange={handleAutoRefreshChange}
+      onManualRefresh={fetchData}
+      isRefreshing={loading}
+    />
   )
 
   if (error) {
     return (
       <SidebarInset>
-        <Header action={refreshButton} />
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <div className="bg-red-50 dark:bg-red-900 p-4 rounded-lg">
-            <h2 className="text-red-800 dark:text-red-200">Error</h2>
-            <p className="text-red-600 dark:text-red-300">{error}</p>
+        <Header action={refreshControl} />
+        <div className="flex flex-1 flex-col gap-6 p-6">
+          <div className="bg-destructive/10 border border-destructive/20 p-6 rounded-lg">
+            <h2 className="text-lg font-semibold text-destructive mb-2">Error Loading Memory Data</h2>
+            <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         </div>
       </SidebarInset>
@@ -66,26 +85,26 @@ export default function Dashboard() {
 
   return (
     <SidebarInset>
-      <Header action={refreshButton} />
-      <div className="flex flex-1 flex-col gap-4 p-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="system">System Memory</TabsTrigger>
-            <TabsTrigger value="process">Process Memory</TabsTrigger>
-            <TabsTrigger value="mapping">Memory Mapping</TabsTrigger>
+      <Header action={refreshControl} />
+      <div className="flex flex-1 flex-col gap-6 p-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="system">System</TabsTrigger>
+            <TabsTrigger value="process">Process</TabsTrigger>
+            <TabsTrigger value="mapping">Mapping</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="system">
+          <TabsContent value="system" className="mt-6">
             {data?.systemMemory && <SystemMemoryView data={data.systemMemory} />}
           </TabsContent>
 
-          <TabsContent value="process">
+          <TabsContent value="process" className="mt-6">
             {data?.processMemory && <ProcessMemoryView data={data.processMemory} />}
           </TabsContent>
 
-          <TabsContent value="mapping">
+          <TabsContent value="mapping" className="mt-6">
             {data?.memoryMappings && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <MemoryMappingView data={data.memoryMappings} />
                 <MemoryMapVisualizer entries={data.processMemory?.entries || []} />
               </div>
