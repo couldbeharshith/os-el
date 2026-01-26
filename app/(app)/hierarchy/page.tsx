@@ -11,7 +11,7 @@ export default function MemoryHierarchyPage() {
   const [data, setData] = useState<MemoryHierarchyData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isAutoRefresh, setIsAutoRefresh] = useState(true)
+  const [isAutoRefresh, setIsAutoRefresh] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchData = async () => {

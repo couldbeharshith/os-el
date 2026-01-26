@@ -15,7 +15,7 @@ export default function AnalyticsPage() {
   const [timelineData, setTimelineData] = useState<TimelineData[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isAutoRefresh, setIsAutoRefresh] = useState(true)
+  const [isAutoRefresh, setIsAutoRefresh] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchData = async () => {

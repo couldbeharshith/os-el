@@ -11,7 +11,7 @@ export default function PageTablePage() {
   const [data, setData] = useState<PageTableData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isAutoRefresh, setIsAutoRefresh] = useState(true)
+  const [isAutoRefresh, setIsAutoRefresh] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchData = async () => {
