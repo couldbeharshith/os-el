@@ -1,12 +1,10 @@
 "use client"
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { AlertCircle, AlertTriangle, Info, Loader2 } from "lucide-react"
+import { AlertCircle, AlertTriangle, Info, CheckCircle } from "lucide-react"
 import { MemoryMetrics, MemoryRecommendation } from "@/app/types/analytics"
-import { useEffect, useState, useRef } from "react"
-import { useChat } from 'ai/react'
+import { useEffect, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import Markdown from 'react-markdown'
 
 interface MemoryOptimizerProps {
   metrics: MemoryMetrics
@@ -14,90 +12,43 @@ interface MemoryOptimizerProps {
 
 export function MemoryOptimizer({ metrics }: MemoryOptimizerProps) {
   const [recommendations, setRecommendations] = useState<MemoryRecommendation[]>([])
-  const chatInitialized = useRef(false)
-  
-  const { messages, isLoading, error, append } = useChat()
 
   useEffect(() => {
-    const getRecommendations = async () => {
-      if (chatInitialized.current) return
-      
-      try {
-        chatInitialized.current = true
-        await append({
-          role: 'user',
-          content: `Analyze these memory metrics and provide concise recommendations:
-          - Memory Fragmentation: ${metrics.fragmentation * 100}%
-          - Memory Pressure: ${metrics.pressureScore * 100}%
-          - Swap Usage: ${metrics.swapUsagePercent}%
-          - Page Fault Rate: ${metrics.pageFaultRate}/s
-          
-          Format: "- **[High/Medium/Low]**: Your recommendation here"`,
-        })
-      } catch (err) {
-        setRecommendations(getBasicRecommendations(metrics))
-      }
-    }
-
-    getRecommendations()
-  }, [metrics, append])
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage.role === 'assistant') {
-        const lines = lastMessage.content.split('\n').filter(line => line.trim())
-        const parsedRecommendations: MemoryRecommendation[] = lines.map(line => {
-          const severityMatch = line.match(/\*\*(high|medium|low)\*\*/i)
-          const severity = (severityMatch?.[1].toLowerCase() || 'medium') as 'high' | 'medium' | 'low'
-          const message = line.replace(/\*\*\w+\*\*:?/, '').trim()
-          
-          return {
-            message,
-            severity,
-            type: 'ai'
-          }
-        })
-        
-        setRecommendations(parsedRecommendations)
-      }
-    }
-  }, [messages])
+    setRecommendations(getRecommendations(metrics))
+  }, [metrics])
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          Optimization Recommendations
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-        </CardTitle>
+        <CardTitle>Optimization Recommendations</CardTitle>
       </CardHeader>
       <CardContent>
-        {error && (
-          <p className="text-sm text-red-500 mb-4">{error.message}</p>
-        )}
         <ScrollArea className="h-[300px]">
-          <div className="space-y-2 pr-4">
-            {recommendations.map((rec, i) => (
-              <div key={i} className="flex items-start gap-2 rounded-sm p-2 hover:bg-muted/50">
-                {rec.severity === 'high' ? (
-                  <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                ) : rec.severity === 'medium' ? (
-                  <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                ) : (
-                  <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                )}
-                <Markdown 
-                  className="text-sm prose dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-0"
-                >
-                  {rec.message}
-                </Markdown>
+          <div className="space-y-3 pr-4">
+            {recommendations.length > 0 ? (
+              recommendations.map((rec, i) => (
+                <div key={i} className="flex items-start gap-3 rounded-lg p-3 border bg-card hover:bg-muted/50 transition-colors">
+                  {rec.severity === 'high' ? (
+                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                  ) : rec.severity === 'medium' ? (
+                    <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+                  ) : rec.severity === 'low' ? (
+                    <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm leading-relaxed">{rec.message}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg p-3 border bg-card">
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  System memory is operating within normal parameters.
+                </p>
               </div>
-            ))}
-            {!isLoading && recommendations.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No optimization recommendations at this time.
-              </p>
             )}
           </div>
         </ScrollArea>
@@ -106,31 +57,99 @@ export function MemoryOptimizer({ metrics }: MemoryOptimizerProps) {
   )
 }
 
-// Fallback basic recommendations
-function getBasicRecommendations(metrics: MemoryMetrics): MemoryRecommendation[] {
+function getRecommendations(metrics: MemoryMetrics): MemoryRecommendation[] {
   const recommendations: MemoryRecommendation[] = []
 
-  if (metrics.fragmentation > 0.7) {
+  // Memory Fragmentation Analysis
+  if (metrics.fragmentation > 0.8) {
     recommendations.push({
-      message: "High memory fragmentation detected. Consider compacting memory or restarting the application.",
+      message: "Critical memory fragmentation detected (>80%). Consider restarting applications or the system to consolidate memory.",
       severity: 'high',
+      type: 'fragmentation'
+    })
+  } else if (metrics.fragmentation > 0.6) {
+    recommendations.push({
+      message: "Moderate memory fragmentation detected. Monitor for performance degradation and consider periodic restarts.",
+      severity: 'medium',
+      type: 'fragmentation'
+    })
+  } else if (metrics.fragmentation > 0.4) {
+    recommendations.push({
+      message: "Low memory fragmentation. System is managing memory efficiently.",
+      severity: 'low',
       type: 'fragmentation'
     })
   }
 
-  if (metrics.pressureScore > 0.8) {
+  // Memory Pressure Analysis
+  if (metrics.pressureScore > 0.85) {
     recommendations.push({
-      message: "System is under memory pressure. Consider freeing up memory or adding more RAM.",
+      message: "Critical memory pressure detected. Close unnecessary applications or upgrade RAM to prevent system instability.",
       severity: 'high',
+      type: 'pressure'
+    })
+  } else if (metrics.pressureScore > 0.7) {
+    recommendations.push({
+      message: "High memory pressure. Consider closing background applications to free up memory.",
+      severity: 'high',
+      type: 'pressure'
+    })
+  } else if (metrics.pressureScore > 0.5) {
+    recommendations.push({
+      message: "Moderate memory usage. System has adequate memory but monitor for spikes.",
+      severity: 'medium',
       type: 'pressure'
     })
   }
 
+  // Swap Usage Analysis
   if (metrics.swapUsagePercent > 80) {
     recommendations.push({
-      message: "High swap usage detected. This may impact system performance.",
+      message: "Critical swap usage (>80%). System performance is severely degraded. Add more RAM or reduce workload.",
+      severity: 'high',
+      type: 'swap'
+    })
+  } else if (metrics.swapUsagePercent > 50) {
+    recommendations.push({
+      message: "High swap usage detected. This may cause performance issues. Consider adding more RAM.",
       severity: 'medium',
       type: 'swap'
+    })
+  } else if (metrics.swapUsagePercent > 20) {
+    recommendations.push({
+      message: "Moderate swap usage. System is using disk for memory overflow, which may slow performance.",
+      severity: 'low',
+      type: 'swap'
+    })
+  }
+
+  // Page Fault Rate Analysis
+  if (metrics.pageFaultRate > 1000) {
+    recommendations.push({
+      message: "Very high page fault rate detected. System is thrashing. Reduce memory-intensive applications immediately.",
+      severity: 'high',
+      type: 'pagefault'
+    })
+  } else if (metrics.pageFaultRate > 500) {
+    recommendations.push({
+      message: "High page fault rate. System is frequently accessing swap. Consider optimizing memory usage.",
+      severity: 'medium',
+      type: 'pagefault'
+    })
+  } else if (metrics.pageFaultRate > 100) {
+    recommendations.push({
+      message: "Moderate page fault rate. Normal for active systems but monitor for increases.",
+      severity: 'low',
+      type: 'pagefault'
+    })
+  }
+
+  // Overall System Health
+  if (recommendations.length === 0 || recommendations.every(r => r.severity === 'low')) {
+    recommendations.push({
+      message: "System memory health is good. All metrics are within optimal ranges.",
+      severity: 'good' as any,
+      type: 'overall'
     })
   }
 
