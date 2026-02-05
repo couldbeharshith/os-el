@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       console.log(`Starting stress-ng with ${memoryBytes} memory allocation`)
 
       // Use stress-ng with safe options
-      // --vm 1: spawn ONLY 1 worker (not 5!)
+      // --vm 1: spawn ONLY 1 worker
       // --vm-bytes: amount of memory to allocate
       // --vm-keep: keep memory allocated
       // --timeout 0: run indefinitely

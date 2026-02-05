@@ -41,13 +41,46 @@ void update_analytics(void) {
         g_last_minor_faults = usage.ru_minflt;
     }
 
+    // Try to read container memory limit first (for Docker/cgroups)
+    unsigned long memTotal = 0;
+    unsigned long memAvailable = 0;
+    
+    // Check cgroup v2 first
+    FILE *cgroup_mem = fopen("/sys/fs/cgroup/memory.max", "r");
+    if (cgroup_mem) {
+        char limit_str[64];
+        if (fgets(limit_str, sizeof(limit_str), cgroup_mem)) {
+            if (strcmp(limit_str, "max\n") != 0) {
+                unsigned long limit_bytes = strtoul(limit_str, NULL, 10);
+                memTotal = limit_bytes / 1024; // Convert to KB
+            }
+        }
+        fclose(cgroup_mem);
+    }
+    
+    // If cgroup v2 failed, try cgroup v1
+    if (memTotal == 0) {
+        cgroup_mem = fopen("/sys/fs/cgroup/memory/memory.limit_in_bytes", "r");
+        if (cgroup_mem) {
+            unsigned long limit_bytes;
+            if (fscanf(cgroup_mem, "%lu", &limit_bytes) == 1) {
+                // Check if it's not the "unlimited" value (very large number)
+                if (limit_bytes < (1UL << 60)) {
+                    memTotal = limit_bytes / 1024; // Convert to KB
+                }
+            }
+            fclose(cgroup_mem);
+        }
+    }
+
+    // Fallback to /proc/meminfo if no cgroup limit found
     FILE *meminfo = fopen("/proc/meminfo", "r");
     if (meminfo) {
         char line[256];
-        unsigned long memTotal = 0, memFree = 0, memAvailable = 0, cached = 0, buffers = 0;
+        unsigned long memFree = 0, cached = 0, buffers = 0;
         
         while (fgets(line, sizeof(line), meminfo)) {
-            if (strncmp(line, "MemTotal:", 9) == 0)
+            if (memTotal == 0 && strncmp(line, "MemTotal:", 9) == 0)
                 sscanf(line, "MemTotal: %lu", &memTotal);
             else if (strncmp(line, "MemFree:", 8) == 0)
                 sscanf(line, "MemFree: %lu", &memFree);
@@ -59,6 +92,11 @@ void update_analytics(void) {
                 sscanf(line, "Buffers: %lu", &buffers);
         }
         fclose(meminfo);
+
+        // If MemAvailable not found, calculate it
+        if (memAvailable == 0) {
+            memAvailable = memFree + cached + buffers;
+        }
 
         pthread_mutex_lock(&g_analytics_mutex);
         g_analytics.total_memory = memTotal * 1024;
