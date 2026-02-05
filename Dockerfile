@@ -36,6 +36,9 @@ COPY --from=builder /app/bin/vmd ./bin/vmd
 
 RUN chmod +x bin/a bin/vmd
 
+# Set environment variable for refresh interval
+ENV NEXT_PUBLIC_REFRESH_INTERVAL=800
+
 # Build Next.js app
 RUN npm run build
 

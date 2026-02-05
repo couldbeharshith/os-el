@@ -34,20 +34,25 @@ export async function POST(request: Request) {
             console.log(\`Allocated: \${totalMB}MB\`);
             
             if (totalMB >= ${CAP_LIMIT_MB}) { // Cap at ${CAP_LIMIT_MB}MB
-              console.log('Reached ${CAP_LIMIT_MB}MB cap');
+              console.log('Reached ${CAP_LIMIT_MB}MB cap - holding memory');
               clearInterval(interval);
+              // Don't exit - keep holding the memory
             }
           } catch (e) {
             console.log('Memory allocation limit reached');
             clearInterval(interval);
+            // Don't exit - keep holding the memory
           }
         }, ${ALLOCATION_INTERVAL_MS});
         
-        // Keep process alive
+        // Keep process alive indefinitely
         process.on('SIGTERM', () => {
-          console.log('Stress test stopped');
+          console.log('Stress test stopped - releasing memory');
           process.exit(0);
         });
+        
+        // Prevent process from exiting
+        setInterval(() => {}, 1000000);
       `])
 
       stressProcess.stdout.on('data', (data: Buffer) => {
