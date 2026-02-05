@@ -10,7 +10,7 @@ const kbToGb = (kb: number) => kb / (1024 * 1024)
 
 export async function GET() {
   try {
-    const { stdout, stderr } = await execAsync('echo "1\n2\n3\n6\n" | ./bin/a')
+    const { stdout, stderr } = await execAsync('echo "1\n2\n3\n6\n" | sudo ./bin/a')
     
     if (stderr) {
       console.error('VMD Error:', stderr)
