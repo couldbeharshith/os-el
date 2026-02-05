@@ -10,6 +10,8 @@ import { Header } from "@/app/components/header/Header"
 import { RefreshControl } from "@/app/components/header/RefreshControl"
 import { StressTestControl } from "@/app/components/stress/StressTestControl"
 
+const refreshInterval = parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL || '5000')
+
 export default function AnalyticsPage() {
   const [metrics, setMetrics] = useState<MemoryMetrics | null>(null)
   const [initialMetrics, setInitialMetrics] = useState<MemoryMetrics | null>(null)
@@ -50,7 +52,7 @@ export default function AnalyticsPage() {
     fetchData()
     
     if (isAutoRefresh) {
-      intervalRef.current = setInterval(fetchData, 5000)
+      intervalRef.current = setInterval(fetchData, refreshInterval)
     }
     
     return () => {

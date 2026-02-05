@@ -7,6 +7,8 @@ import { SidebarInset } from "@/components/ui/sidebar"
 import { Header } from "@/app/components/header/Header"
 import { RefreshControl } from "@/app/components/header/RefreshControl"
 
+const refreshInterval = parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL || '5000')
+
 export default function MemoryHierarchyPage() {
   const [data, setData] = useState<MemoryHierarchyData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +35,7 @@ export default function MemoryHierarchyPage() {
     fetchData()
     
     if (isAutoRefresh) {
-      intervalRef.current = setInterval(fetchData, 5000)
+      intervalRef.current = setInterval(fetchData, refreshInterval)
     }
     
     return () => {
