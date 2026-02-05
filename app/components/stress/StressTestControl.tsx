@@ -5,15 +5,24 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Activity, Square, Zap } from "lucide-react"
-import { STRESS_CONFIG } from "@/app/config/stress"
+
+interface StressConfig {
+  CHUNK_SIZE_MB: number
+  CAP_LIMIT_MB: number
+  ALLOCATION_INTERVAL_MS: number
+}
 
 export function StressTestControl() {
   const [status, setStatus] = useState<'running' | 'stopped'>('stopped')
   const [pid, setPid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [config, setConfig] = useState<StressConfig>({
+    CHUNK_SIZE_MB: 150,
+    CAP_LIMIT_MB: 2550,
+    ALLOCATION_INTERVAL_MS: 800
+  })
 
-  const { CHUNK_SIZE_MB, CAP_LIMIT_MB, ALLOCATION_INTERVAL_MS } = STRESS_CONFIG
-  const intervalSeconds = ALLOCATION_INTERVAL_MS / 1000
+  const intervalSeconds = config.ALLOCATION_INTERVAL_MS / 1000
 
   const checkStatus = async () => {
     try {
@@ -21,6 +30,9 @@ export function StressTestControl() {
       const data = await res.json()
       setStatus(data.status)
       setPid(data.pid)
+      if (data.config) {
+        setConfig(data.config)
+      }
     } catch (err) {
       console.error('Failed to check stress status:', err)
     }
@@ -43,6 +55,9 @@ export function StressTestControl() {
       const data = await res.json()
       setStatus(data.status === 'started' ? 'running' : status)
       setPid(data.pid)
+      if (data.config) {
+        setConfig(data.config)
+      }
     } catch (err) {
       console.error('Failed to start stress test:', err)
     } finally {
@@ -124,8 +139,8 @@ export function StressTestControl() {
           <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
             <p className="font-semibold mb-1">How it works:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Allocates memory in {CHUNK_SIZE_MB}MB chunks every {intervalSeconds} second{intervalSeconds !== 1 ? 's' : ''}</li>
-              <li>Caps at {CAP_LIMIT_MB}MB to prevent system issues</li>
+              <li>Allocates memory in {config.CHUNK_SIZE_MB}MB chunks every {intervalSeconds} second{intervalSeconds !== 1 ? 's' : ''}</li>
+              <li>Caps at {config.CAP_LIMIT_MB}MB to prevent system issues</li>
               <li>Watch memory usage increase in real-time</li>
               <li>Stop button releases all allocated memory</li>
             </ul>

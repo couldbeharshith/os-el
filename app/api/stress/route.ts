@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { spawn } from 'child_process'
-import { STRESS_CONFIG } from '@/app/config/stress'
+import { getStressConfig } from '@/app/config/stress'
 
 let stressProcess: any = null
 
@@ -16,7 +16,8 @@ export async function POST(request: Request) {
         })
       }
 
-      const { CHUNK_SIZE_MB, CAP_LIMIT_MB, ALLOCATION_INTERVAL_MS } = STRESS_CONFIG
+      const config = await getStressConfig()
+      const { CHUNK_SIZE_MB, CAP_LIMIT_MB, ALLOCATION_INTERVAL_MS } = config
 
       // Start stress test: allocate memory in chunks
       stressProcess = spawn('node', ['-e', `
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
         status: 'started',
         message: `Memory stress test started - allocating up to ${CAP_LIMIT_MB}MB`,
         pid: stressProcess.pid,
-        config: STRESS_CONFIG
+        config
       })
     } 
     
@@ -83,10 +84,11 @@ export async function POST(request: Request) {
     }
 
     else if (action === 'status') {
+      const config = await getStressConfig()
       return NextResponse.json({ 
         status: stressProcess ? 'running' : 'stopped',
         pid: stressProcess?.pid || null,
-        config: STRESS_CONFIG
+        config
       })
     }
 
@@ -102,9 +104,10 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  const config = await getStressConfig()
   return NextResponse.json({ 
     status: stressProcess ? 'running' : 'stopped',
     pid: stressProcess?.pid || null,
-    config: STRESS_CONFIG
+    config
   })
 }
