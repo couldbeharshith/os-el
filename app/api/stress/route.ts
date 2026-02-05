@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
-import { spawn } from 'child_process'
+import { spawn, exec } from 'child_process'
+import { promisify } from 'util'
 import { getStressConfig } from '@/app/config/stress'
 
+const execAsync = promisify(exec)
 let stressProcess: any = null
 
 export async function POST(request: Request) {
@@ -17,67 +19,48 @@ export async function POST(request: Request) {
       }
 
       const config = await getStressConfig()
-      const { CHUNK_SIZE_MB, CAP_LIMIT_MB, ALLOCATION_INTERVAL_MS } = config
+      const { CAP_LIMIT_MB } = config
 
-      // Start stress test: allocate memory in chunks
-      stressProcess = spawn('node', ['-e', `
-        const chunks = [];
-        const allocSize = ${CHUNK_SIZE_MB} * 1024 * 1024; // ${CHUNK_SIZE_MB}MB chunks
-        let totalMB = 0;
-        
-        console.log('Starting memory stress test...');
-        console.log('Chunk size: ${CHUNK_SIZE_MB}MB, Cap: ${CAP_LIMIT_MB}MB');
-        
-        const interval = setInterval(() => {
-          try {
-            // Allocate buffer
-            const buffer = Buffer.alloc(allocSize);
-            
-            // CRITICAL: Write to the buffer to force it into physical RAM
-            // Without this, the OS may not actually allocate physical memory
-            for (let i = 0; i < buffer.length; i += 4096) {
-              buffer[i] = 1;
-            }
-            
-            chunks.push(buffer);
-            totalMB += ${CHUNK_SIZE_MB};
-            console.log(\`Allocated: \${totalMB}MB (RSS: \${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB)\`);
-            
-            if (totalMB >= ${CAP_LIMIT_MB}) { // Cap at ${CAP_LIMIT_MB}MB
-              console.log('Reached ${CAP_LIMIT_MB}MB cap - holding memory');
-              clearInterval(interval);
-              // Don't exit - keep holding the memory
-            }
-          } catch (e) {
-            console.log('Memory allocation limit reached:', e.message);
-            clearInterval(interval);
-            // Don't exit - keep holding the memory
-          }
-        }, ${ALLOCATION_INTERVAL_MS});
-        
-        // Keep process alive indefinitely
-        process.on('SIGTERM', () => {
-          console.log('Stress test stopped - releasing memory');
-          process.exit(0);
-        });
-        
-        // Prevent process from exiting
-        setInterval(() => {}, 1000000);
-      `])
+      // Convert MB to bytes for stress-ng
+      const memoryBytes = `${CAP_LIMIT_MB}M`
+
+      console.log(`Starting stress-ng with ${memoryBytes} memory allocation`)
+
+      // Use stress-ng to allocate and hold memory
+      // --vm 1: spawn 1 worker
+      // --vm-bytes: amount of memory to allocate
+      // --vm-keep: keep memory allocated (don't free and reallocate)
+      // --timeout 0: run indefinitely
+      stressProcess = spawn('stress-ng', [
+        '--vm', '1',
+        '--vm-bytes', memoryBytes,
+        '--vm-keep',
+        '--timeout', '0',
+        '--verbose'
+      ])
 
       stressProcess.stdout.on('data', (data: Buffer) => {
-        console.log(`Stress: ${data.toString()}`)
+        console.log(`stress-ng: ${data.toString()}`)
       })
 
-      stressProcess.on('exit', () => {
+      stressProcess.stderr.on('data', (data: Buffer) => {
+        console.log(`stress-ng: ${data.toString()}`)
+      })
+
+      stressProcess.on('exit', (code: number) => {
+        console.log(`stress-ng exited with code ${code}`)
         stressProcess = null
       })
 
+      // Give it a moment to start
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       return NextResponse.json({ 
         status: 'started',
-        message: `Memory stress test started - allocating up to ${CAP_LIMIT_MB}MB`,
+        message: `Memory stress test started - allocating ${CAP_LIMIT_MB}MB`,
         pid: stressProcess.pid,
-        config
+        config,
+        tool: 'stress-ng'
       })
     } 
     
@@ -89,7 +72,16 @@ export async function POST(request: Request) {
         })
       }
 
+      console.log('Stopping stress-ng...')
       stressProcess.kill('SIGTERM')
+      
+      // Force kill if it doesn't stop in 2 seconds
+      setTimeout(() => {
+        if (stressProcess) {
+          stressProcess.kill('SIGKILL')
+        }
+      }, 2000)
+      
       stressProcess = null
 
       return NextResponse.json({ 

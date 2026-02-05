@@ -6,8 +6,8 @@ const execAsync = promisify(exec)
 
 export async function GET() {
   try {
-    // Find all node processes running the stress test
-    const { stdout } = await execAsync('ps aux | grep "node.*Buffer.alloc" | grep -v grep || echo ""')
+    // Find stress-ng processes
+    const { stdout } = await execAsync('ps aux | grep "stress-ng" | grep -v grep || echo ""')
     
     if (!stdout.trim()) {
       return NextResponse.json({ 
