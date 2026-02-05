@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { spawn } from 'child_process'
+import { STRESS_CONFIG } from '@/app/config/stress'
 
 let stressProcess: any = null
 
@@ -15,10 +16,12 @@ export async function POST(request: Request) {
         })
       }
 
+      const { CHUNK_SIZE_MB, CAP_LIMIT_MB, ALLOCATION_INTERVAL_MS } = STRESS_CONFIG
+
       // Start stress test: allocate memory in chunks
       stressProcess = spawn('node', ['-e', `
         const chunks = [];
-        const allocSize = 50 * 1024 * 1024; // 50MB chunks
+        const allocSize = ${CHUNK_SIZE_MB} * 1024 * 1024; // ${CHUNK_SIZE_MB}MB chunks
         let totalMB = 0;
         
         console.log('Starting memory stress test...');
@@ -26,18 +29,18 @@ export async function POST(request: Request) {
         const interval = setInterval(() => {
           try {
             chunks.push(Buffer.alloc(allocSize));
-            totalMB += 50;
+            totalMB += ${CHUNK_SIZE_MB};
             console.log(\`Allocated: \${totalMB}MB\`);
             
-            if (totalMB >= 500) { // Cap at 500MB
-              console.log('Reached 500MB cap');
+            if (totalMB >= ${CAP_LIMIT_MB}) { // Cap at ${CAP_LIMIT_MB}MB
+              console.log('Reached ${CAP_LIMIT_MB}MB cap');
               clearInterval(interval);
             }
           } catch (e) {
             console.log('Memory allocation limit reached');
             clearInterval(interval);
           }
-        }, 1000);
+        }, ${ALLOCATION_INTERVAL_MS});
         
         // Keep process alive
         process.on('SIGTERM', () => {
@@ -56,8 +59,9 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ 
         status: 'started',
-        message: 'Memory stress test started - allocating up to 500MB',
-        pid: stressProcess.pid
+        message: `Memory stress test started - allocating up to ${CAP_LIMIT_MB}MB`,
+        pid: stressProcess.pid,
+        config: STRESS_CONFIG
       })
     } 
     
@@ -81,7 +85,8 @@ export async function POST(request: Request) {
     else if (action === 'status') {
       return NextResponse.json({ 
         status: stressProcess ? 'running' : 'stopped',
-        pid: stressProcess?.pid || null
+        pid: stressProcess?.pid || null,
+        config: STRESS_CONFIG
       })
     }
 
@@ -99,6 +104,7 @@ export async function POST(request: Request) {
 export async function GET() {
   return NextResponse.json({ 
     status: stressProcess ? 'running' : 'stopped',
-    pid: stressProcess?.pid || null
+    pid: stressProcess?.pid || null,
+    config: STRESS_CONFIG
   })
 }

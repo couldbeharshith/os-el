@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Activity, Square, Zap } from "lucide-react"
+import { STRESS_CONFIG } from "@/app/config/stress"
 
 export function StressTestControl() {
   const [status, setStatus] = useState<'running' | 'stopped'>('stopped')
   const [pid, setPid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const { CHUNK_SIZE_MB, CAP_LIMIT_MB, ALLOCATION_INTERVAL_MS } = STRESS_CONFIG
+  const intervalSeconds = ALLOCATION_INTERVAL_MS / 1000
 
   const checkStatus = async () => {
     try {
@@ -120,8 +124,8 @@ export function StressTestControl() {
           <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
             <p className="font-semibold mb-1">How it works:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Allocates memory in 50MB chunks every second</li>
-              <li>Caps at 500MB to prevent system issues</li>
+              <li>Allocates memory in {CHUNK_SIZE_MB}MB chunks every {intervalSeconds} second{intervalSeconds !== 1 ? 's' : ''}</li>
+              <li>Caps at {CAP_LIMIT_MB}MB to prevent system issues</li>
               <li>Watch memory usage increase in real-time</li>
               <li>Stop button releases all allocated memory</li>
             </ul>
