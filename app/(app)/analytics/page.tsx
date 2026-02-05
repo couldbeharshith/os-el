@@ -8,6 +8,7 @@ import { MemoryOptimizer } from '@/app/components/analysis/MemoryOptimizer'
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Header } from "@/app/components/header/Header"
 import { RefreshControl } from "@/app/components/header/RefreshControl"
+import { StressTestControl } from "@/app/components/stress/StressTestControl"
 
 export default function AnalyticsPage() {
   const [metrics, setMetrics] = useState<MemoryMetrics | null>(null)
@@ -94,6 +95,8 @@ export default function AnalyticsPage() {
     <SidebarInset>
       <Header action={refreshControl} />
       <div className="flex flex-1 flex-col gap-6 p-6">
+        <StressTestControl />
+        
         {metrics && (
           <>
             <div className="grid gap-6 md:grid-cols-2">

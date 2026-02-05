@@ -10,6 +10,7 @@ import { MemoryData } from '@/app/types/memory'
 import { SidebarInset } from "@/components/ui/sidebar"
 import { Header } from "@/app/components/header/Header"
 import { RefreshControl } from "@/app/components/header/RefreshControl"
+import { StressTestControl } from "@/app/components/stress/StressTestControl"
 
 const refreshInterval = parseInt(process.env.NEXT_PUBLIC_REFRESH_INTERVAL || '5000')
 
@@ -87,6 +88,8 @@ export default function Dashboard() {
     <SidebarInset>
       <Header action={refreshControl} />
       <div className="flex flex-1 flex-col gap-6 p-6">
+        <StressTestControl />
+        
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="system">System</TabsTrigger>
