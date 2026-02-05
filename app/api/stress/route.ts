@@ -26,12 +26,22 @@ export async function POST(request: Request) {
         let totalMB = 0;
         
         console.log('Starting memory stress test...');
+        console.log('Chunk size: ${CHUNK_SIZE_MB}MB, Cap: ${CAP_LIMIT_MB}MB');
         
         const interval = setInterval(() => {
           try {
-            chunks.push(Buffer.alloc(allocSize));
+            // Allocate buffer
+            const buffer = Buffer.alloc(allocSize);
+            
+            // CRITICAL: Write to the buffer to force it into physical RAM
+            // Without this, the OS may not actually allocate physical memory
+            for (let i = 0; i < buffer.length; i += 4096) {
+              buffer[i] = 1;
+            }
+            
+            chunks.push(buffer);
             totalMB += ${CHUNK_SIZE_MB};
-            console.log(\`Allocated: \${totalMB}MB\`);
+            console.log(\`Allocated: \${totalMB}MB (RSS: \${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB)\`);
             
             if (totalMB >= ${CAP_LIMIT_MB}) { // Cap at ${CAP_LIMIT_MB}MB
               console.log('Reached ${CAP_LIMIT_MB}MB cap - holding memory');
@@ -39,7 +49,7 @@ export async function POST(request: Request) {
               // Don't exit - keep holding the memory
             }
           } catch (e) {
-            console.log('Memory allocation limit reached');
+            console.log('Memory allocation limit reached:', e.message);
             clearInterval(interval);
             // Don't exit - keep holding the memory
           }
