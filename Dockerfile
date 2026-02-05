@@ -5,7 +5,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libjson-c-dev \
     make \
-    gcc
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY bin/ ./bin/
@@ -21,17 +22,24 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci
 
+# Copy application code
 COPY . .
+
+# Copy compiled C binaries from builder
 COPY --from=builder /app/bin/a ./bin/a
 COPY --from=builder /app/bin/vmd ./bin/vmd
 
 RUN chmod +x bin/a bin/vmd
 
+# Build Next.js app
 RUN npm run build
 
 EXPOSE 3000
+
+ENV NODE_ENV=production
 
 CMD ["npm", "start"]
