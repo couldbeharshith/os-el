@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Square, Zap } from "lucide-react"
+import { Activity, Square, Zap, TrendingUp } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 
 interface StressConfig {
   CHUNK_SIZE_MB: number
@@ -12,10 +13,17 @@ interface StressConfig {
   ALLOCATION_INTERVAL_MS: number
 }
 
+interface StressStats {
+  running: boolean
+  total_rss_mb: number
+  process_count: number
+}
+
 export function StressTestControl() {
   const [status, setStatus] = useState<'running' | 'stopped'>('stopped')
   const [pid, setPid] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState<StressStats | null>(null)
   const [config, setConfig] = useState<StressConfig>({
     CHUNK_SIZE_MB: 150,
     CAP_LIMIT_MB: 2550,
@@ -23,6 +31,7 @@ export function StressTestControl() {
   })
 
   const intervalSeconds = config.ALLOCATION_INTERVAL_MS / 1000
+  const progressPercent = stats?.total_rss_mb ? Math.min((stats.total_rss_mb / config.CAP_LIMIT_MB) * 100, 100) : 0
 
   const checkStatus = async () => {
     try {
@@ -38,10 +47,29 @@ export function StressTestControl() {
     }
   }
 
+  const checkStats = async () => {
+    try {
+      const res = await fetch('/api/stress-stats')
+      const data = await res.json()
+      if (data.running) {
+        setStats(data)
+      } else {
+        setStats(null)
+      }
+    } catch (err) {
+      console.error('Failed to check stress stats:', err)
+    }
+  }
+
   useEffect(() => {
     checkStatus()
-    const interval = setInterval(checkStatus, 3000)
-    return () => clearInterval(interval)
+    checkStats()
+    const statusInterval = setInterval(checkStatus, 3000)
+    const statsInterval = setInterval(checkStats, 1000) // Update stats every second
+    return () => {
+      clearInterval(statusInterval)
+      clearInterval(statsInterval)
+    }
   }, [])
 
   const handleStart = async () => {
@@ -76,6 +104,7 @@ export function StressTestControl() {
       const data = await res.json()
       setStatus(data.status === 'stopped' ? 'stopped' : status)
       setPid(null)
+      setStats(null)
     } catch (err) {
       console.error('Failed to stop stress test:', err)
     } finally {
@@ -110,6 +139,24 @@ export function StressTestControl() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {stats && stats.running && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <TrendingUp className="h-4 w-4" />
+                  Stress Process Memory
+                </span>
+                <span className="font-mono font-semibold">
+                  {stats.total_rss_mb} MB / {config.CAP_LIMIT_MB} MB
+                </span>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
+              <p className="text-xs text-muted-foreground text-right">
+                {progressPercent.toFixed(1)}% of cap reached
+              </p>
+            </div>
+          )}
+
           {pid && (
             <div className="text-sm text-muted-foreground">
               Process ID: <code className="bg-muted px-2 py-1 rounded">{pid}</code>
@@ -141,7 +188,7 @@ export function StressTestControl() {
             <ul className="list-disc list-inside space-y-1">
               <li>Allocates memory in {config.CHUNK_SIZE_MB}MB chunks every {intervalSeconds} second{intervalSeconds !== 1 ? 's' : ''}</li>
               <li>Caps at {config.CAP_LIMIT_MB}MB to prevent system issues</li>
-              <li>Watch memory usage increase in real-time</li>
+              <li>Watch memory usage increase in real-time above</li>
               <li>Stop button releases all allocated memory</li>
             </ul>
           </div>
