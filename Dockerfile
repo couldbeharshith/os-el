@@ -13,11 +13,11 @@ COPY bin/ ./bin/
 RUN cd bin && make
 
 # Final stage
-FROM node:18-alpine
+FROM node:18-slim
 
-RUN apk add --no-cache \
-    libc6-compat \
-    libjson-c
+RUN apt-get update && apt-get install -y \
+    libjson-c5 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
