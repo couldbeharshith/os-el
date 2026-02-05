@@ -19,17 +19,37 @@ export async function POST(request: Request) {
       }
 
       const config = await getStressConfig()
-      const { CAP_LIMIT_MB } = config
+      let { CAP_LIMIT_MB } = config
 
-      // Convert MB to bytes for stress-ng
+      // Check available memory to prevent crashes
+      try {
+        const { stdout } = await execAsync('free -m | grep "Mem:" | awk \'{print $7}\'')
+        const availableMB = parseInt(stdout.trim())
+        
+        // Use at most 60% of available memory to prevent OOM
+        const safeLimitMB = Math.floor(availableMB * 0.6)
+        
+        if (CAP_LIMIT_MB > safeLimitMB) {
+          console.log(`Reducing cap from ${CAP_LIMIT_MB}MB to ${safeLimitMB}MB (60% of available ${availableMB}MB)`)
+          CAP_LIMIT_MB = safeLimitMB
+        }
+      } catch (err) {
+        console.error('Failed to check available memory:', err)
+      }
+
+      // Ensure minimum of 100MB
+      if (CAP_LIMIT_MB < 100) {
+        CAP_LIMIT_MB = 100
+      }
+
       const memoryBytes = `${CAP_LIMIT_MB}M`
 
       console.log(`Starting stress-ng with ${memoryBytes} memory allocation`)
 
-      // Use stress-ng to allocate and hold memory
-      // --vm 1: spawn 1 worker
+      // Use stress-ng with safe options
+      // --vm 1: spawn ONLY 1 worker (not 5!)
       // --vm-bytes: amount of memory to allocate
-      // --vm-keep: keep memory allocated (don't free and reallocate)
+      // --vm-keep: keep memory allocated
       // --timeout 0: run indefinitely
       stressProcess = spawn('stress-ng', [
         '--vm', '1',
@@ -52,14 +72,19 @@ export async function POST(request: Request) {
         stressProcess = null
       })
 
+      stressProcess.on('error', (err: Error) => {
+        console.error(`stress-ng error:`, err)
+        stressProcess = null
+      })
+
       // Give it a moment to start
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       return NextResponse.json({ 
         status: 'started',
         message: `Memory stress test started - allocating ${CAP_LIMIT_MB}MB`,
-        pid: stressProcess.pid,
-        config,
+        pid: stressProcess?.pid,
+        config: { ...config, CAP_LIMIT_MB },
         tool: 'stress-ng'
       })
     } 
@@ -73,14 +98,22 @@ export async function POST(request: Request) {
       }
 
       console.log('Stopping stress-ng...')
-      stressProcess.kill('SIGTERM')
       
-      // Force kill if it doesn't stop in 2 seconds
-      setTimeout(() => {
-        if (stressProcess) {
-          stressProcess.kill('SIGKILL')
-        }
-      }, 2000)
+      try {
+        // Try graceful shutdown first
+        stressProcess.kill('SIGTERM')
+        
+        // Force kill if it doesn't stop in 3 seconds
+        setTimeout(() => {
+          if (stressProcess) {
+            console.log('Force killing stress-ng...')
+            stressProcess.kill('SIGKILL')
+            stressProcess = null
+          }
+        }, 3000)
+      } catch (err) {
+        console.error('Error stopping stress-ng:', err)
+      }
       
       stressProcess = null
 
