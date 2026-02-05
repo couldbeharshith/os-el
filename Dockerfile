@@ -18,6 +18,7 @@ FROM node:18-slim
 
 RUN apt-get update && apt-get install -y \
     libjson-c5 \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
