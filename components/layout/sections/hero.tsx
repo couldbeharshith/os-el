@@ -37,7 +37,7 @@ export const Hero = () => (
             </p>
           </div>
           <div className="flex flex-row gap-4">
-            <Link href="https://github.com/CubeStar1/memory-flow">
+            <Link href="https://github.com/couldbeharshith/os-el">
               <Button size="lg" className="gap-4" variant="outline">
                 View on GitHub <Github className="w-4 h-4" />
               </Button>

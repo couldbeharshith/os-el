@@ -5,8 +5,8 @@ const CONFIG_API_URL = 'https://670b-2406-7400-50-100a-da0-4847-31f9-49ee.ngrok-
 
 // Default configuration (used if API fetch fails)
 const DEFAULT_CONFIG = {
-  CHUNK_SIZE_MB: 150,
-  CAP_LIMIT_MB: 2550,
+  CHUNK_SIZE_MB: 50,
+  CAP_LIMIT_MB: 300,
   ALLOCATION_INTERVAL_MS: 800,
 } as const
 
